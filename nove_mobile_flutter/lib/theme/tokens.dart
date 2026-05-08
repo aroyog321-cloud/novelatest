@@ -44,6 +44,8 @@ class NoveColors {
   static const Color cardDark = Color(0xFF242018);
   static const Color cardDarkLight = Color(0xFF2F2A22);
   static const Color darkBorder = Color(0xFF3D3630);
+  static const Color glassDark = Color(0x331A1714);
+  static const Color glassLight = Color(0x33FFFFFF);
 
   // Sticky Note Colors — more vibrant and saturated
   static const Color stickyYellow = Color(0xFFFDD835);
@@ -112,6 +114,15 @@ class NoveRadii {
   static const double xl = 20;
   static const double xxl = 28;
   static const double full = 9999;
+}
+
+class NoveBlur {
+  static const double none = 0;
+  static const double sm = 4;
+  static const double md = 8;
+  static const double lg = 12;
+  static const double xl = 16;
+  static const double xxl = 24;
 }
 
 class NoveSpacing {
@@ -283,7 +294,20 @@ class NoveShadows {
           blurRadius: 12,
         ),
       ];
-<<<<<<< HEAD
+
+  static List<BoxShadow> get glassmorphism => [
+        BoxShadow(
+          color: Colors.black.withOpacity(0.05),
+          offset: const Offset(0, 4),
+          blurRadius: 30,
+        ),
+        BoxShadow(
+          color: Colors.white.withOpacity(0.01),
+          offset: const Offset(0, 1),
+          blurRadius: 0,
+          spreadRadius: 1,
+        ),
+      ];
 }
 
 /// Single source of truth for the 6-color note label palette.
@@ -296,6 +320,3 @@ const kNoteColorLabels = [
   '#ED93B1',
   '#FFFFFF',
 ];
-=======
-}
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f

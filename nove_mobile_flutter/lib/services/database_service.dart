@@ -56,7 +56,7 @@ class DatabaseService {
 
   static Future<List<Note>> getAllNotes() async {
     await init();
-    final sorted = List<Note>.from(_notes)..sort(_sortNotes);
+    final sorted = _notes.where((n) => !n.isDeleted).toList()..sort(_sortNotes);
     return sorted;
   }
 
@@ -71,13 +71,13 @@ class DatabaseService {
 
   static Future<List<Note>> getPinnedNotes() async {
     await init();
-    return _notes.where((note) => note.isPinned).toList()
+    return _notes.where((note) => note.isPinned && !note.isDeleted).toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
 
   static Future<List<Note>> getFavoriteNotes() async {
     await init();
-    return _notes.where((note) => note.isFavorite).toList()
+    return _notes.where((note) => note.isFavorite && !note.isDeleted).toList()
       ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
   }
 
@@ -85,8 +85,9 @@ class DatabaseService {
     await init();
     final searchTerm = query.toLowerCase();
     final filtered = _notes.where((note) =>
-        note.title.toLowerCase().contains(searchTerm) ||
-        note.content.toLowerCase().contains(searchTerm)).toList();
+        !note.isDeleted &&
+        (note.title.toLowerCase().contains(searchTerm) ||
+        note.content.toLowerCase().contains(searchTerm))).toList();
     filtered.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
     return filtered;
   }
@@ -111,23 +112,48 @@ class DatabaseService {
 
   static Future<int> deleteNote(String id) async {
     await init();
+    final index = _notes.indexWhere((n) => n.id == id);
+    if (index != -1) {
+      _notes[index] = _notes[index].copyWith(isDeleted: true);
+      await _save();
+      return 1;
+    }
+    return 0;
+  }
+
+  static Future<int> permanentlyDeleteNote(String id) async {
+    await init();
     final initialLength = _notes.length;
     _notes.removeWhere((note) => note.id == id);
     await _save();
     return initialLength - _notes.length;
   }
 
+  static Future<List<Note>> getDeletedNotes() async {
+    await init();
+    return _notes.where((note) => note.isDeleted).toList()
+      ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+  }
+
+  static Future<void> restoreNote(String id) async {
+    await init();
+    final index = _notes.indexWhere((n) => n.id == id);
+    if (index != -1) {
+      _notes[index] = _notes[index].copyWith(isDeleted: false);
+      await _save();
+    }
+  }
+
   static Future<int> getNotesCount() async {
     await init();
-    return _notes.length;
+    return _notes.where((n) => !n.isDeleted).length;
   }
 
   static Future<List<Note>> getNotesByCategory(String category) async {
     await init();
-    return _notes.where((note) => note.category == category).toList()
+    return _notes.where((note) => !note.isDeleted && note.category == category).toList()
       ..sort(_sortNotes);
   }
-<<<<<<< HEAD
 
   // ─── Note Version History ────────────────────────────────────────────────
 
@@ -200,6 +226,4 @@ class DatabaseService {
       debugPrint('Error deleting versions: $e');
     }
   }
-=======
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
 }

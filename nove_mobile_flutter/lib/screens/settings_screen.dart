@@ -10,6 +10,8 @@ import '../theme/tokens.dart';
 import '../services/note_service.dart';
 import '../services/security_service.dart'; // ADDED
 import '../providers/notes_provider.dart';
+import 'trash_screen.dart';
+import '../services/stats_service.dart';
 import '../../main.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -22,7 +24,9 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _companionEnabled = true;
   bool _isExporting = false;
-  bool _isLocked = false; // ADDED
+  bool _isLocked = false; 
+  int _streak = 0;
+  int _wordsToday = 0;
 
   @override
   void initState() {
@@ -32,10 +36,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   Future<void> _loadPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    final locked = await SecurityService.isLockEnabled(); // ADDED
+    final locked = await SecurityService.isLockEnabled(); 
+    final stats = await StatsService.getStats();
     setState(() {
       _companionEnabled = prefs.getBool('companion_enabled') ?? true;
       _isLocked = locked;
+      _streak = stats['streak'] ?? 0;
+      _wordsToday = stats['wordsToday'] ?? 0;
     });
   }
 
@@ -99,7 +106,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
       if (mounted) {
         final xfile = XFile(file.path);
-        await Share.shareXFiles([xfile], text: 'My NOVE Notes Export');
+        // ignore: deprecated_member_use
+        await Share.shareXFiles([xfile], subject: 'My NOVE Notes Export');
         _showSnack('Export ready to save or share.', isSuccess: true);
       }
     } catch (e) {
@@ -192,6 +200,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final themeMode = ref.watch(themeModeProvider);
+    final notesState = ref.watch(notesProvider);
 
     return Scaffold(
       backgroundColor: NoveColors.bg(context),
@@ -199,29 +208,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           children: [
-            const SizedBox(height: 24),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Settings', style: GoogleFonts.lora(fontSize: 34, fontWeight: FontWeight.bold, color: NoveColors.primaryText(context), letterSpacing: -0.5)),
-                    Text('v1.0.0 · All data stays on device', style: GoogleFonts.dmSans(fontSize: 11, color: NoveColors.mutedText(context), fontWeight: FontWeight.w500)),
-                  ],
-                ),
-                Container(
-                  width: 42,
-                  height: 42,
-                  decoration: BoxDecoration(color: NoveColors.accent(context), shape: BoxShape.circle),
-                  child: Center(child: Text('N', style: GoogleFonts.lora(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white))),
-                ),
-              ],
+            const SizedBox(height: 32),
+            _sectionLabel('Your Journey', context: context),
+            _JourneyDashboard(
+              totalNotes: notesState.notes.length,
+              totalWords: notesState.notes.fold(0, (sum, n) => sum + n.wordCount),
+              streak: _streak,
+              dailyGoal: 500, // Hardcoded for now or fetched from service
+              wordsToday: _wordsToday,
             ),
             const SizedBox(height: 32),
 
-            _SectionLabel('Appearance', context: context),
+            _sectionLabel('Appearance', context: context),
             _SettingsCard(
               isDark: isDark,
               children: [
@@ -259,20 +257,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   subtitle: 'Quick-capture bubble on screen',
                   trailing: Switch(
                     value: _companionEnabled,
-                    onChanged: (v) {
-                      HapticFeedback.lightImpact();
-                      setState(() => _companionEnabled = v);
-                      _saveCompanionPref(v);
-                    },
-                    activeColor: NoveColors.accent(context),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
+                      onChanged: (v) {
+                        HapticFeedback.lightImpact();
+                        setState(() => _companionEnabled = v);
+                        _saveCompanionPref(v);
+                      },
+                      activeThumbColor: NoveColors.accent(context),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
                 ),
               ],
             ),
             const SizedBox(height: 24),
 
-            _SectionLabel('Data & Privacy', context: context),
+            _sectionLabel('Data & Privacy', context: context),
             _SettingsCard(
               isDark: isDark,
               children: [
@@ -301,7 +299,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       HapticFeedback.lightImpact();
                       _toggleLock(v);
                     },
-                    activeColor: NoveColors.accent(context),
+                    activeThumbColor: NoveColors.accent(context),
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
@@ -315,14 +313,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   trailing: Icon(Icons.chevron_right_rounded, color: NoveColors.mutedText(context)),
                   onTap: _handleResetOnboarding,
                 ),
+                _Divider(isDark: isDark),
+                _SettingsRow(
+                  icon: Icons.delete_sweep_rounded,
+                  iconBgColor: isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF0F0F0),
+                  iconColor: NoveColors.secondaryText(context),
+                  title: 'Trash',
+                  subtitle: 'Restore deleted notes',
+                  trailing: Icon(Icons.chevron_right_rounded, color: NoveColors.mutedText(context)),
+                  onTap: () {
+                    Navigator.push(context, MaterialPageRoute(builder: (_) => const TrashScreen()));
+                  },
+                ),
               ],
             ),
             const SizedBox(height: 24),
 
-            _SectionLabel('Danger Zone', context: context, color: NoveColors.error),
+            _sectionLabel('Danger Zone', context: context, color: NoveColors.error),
             _SettingsCard(
               isDark: isDark,
-              borderColor: NoveColors.error.withOpacity(0.2),
+              borderColor: NoveColors.error.withValues(alpha: 0.2),
               children: [
                 _SettingsRow(
                   icon: Icons.delete_outline_rounded,
@@ -331,18 +341,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   title: 'Delete all notes',
                   subtitle: 'Permanent — cannot be undone',
                   titleColor: NoveColors.error,
-                  trailing: Icon(Icons.chevron_right_rounded, color: NoveColors.error.withOpacity(0.6)),
+                  trailing: Icon(Icons.chevron_right_rounded, color: NoveColors.error.withValues(alpha: 0.6)),
                   onTap: _handleDeleteAll,
                 ),
               ],
             ),
             const SizedBox(height: 24),
 
-            _SectionLabel('About', context: context),
+            _sectionLabel('About', context: context),
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: isDark ? NoveColors.cardDark : NoveColors.warmGray100.withOpacity(0.5),
+                color: isDark ? NoveColors.cardDark : NoveColors.warmGray100.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(NoveRadii.lg),
                 border: Border.all(color: NoveColors.cardBorder(context), width: 0.5),
               ),
@@ -366,7 +376,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
-Widget _SectionLabel(String label, {required BuildContext context, Color? color}) {
+Widget _sectionLabel(String label, {required BuildContext context, Color? color}) {
   return Padding(
     padding: const EdgeInsets.only(bottom: 10, left: 4),
     child: Text(label, style: GoogleFonts.dmSans(fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1.5, color: color ?? NoveColors.mutedText(context))),
@@ -442,5 +452,95 @@ class _Divider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Divider(height: 0.5, thickness: 0.5, color: NoveColors.cardBorder(context), indent: 66, endIndent: 0);
+  }
+}
+
+class _JourneyDashboard extends StatelessWidget {
+  final int totalNotes;
+  final int totalWords;
+  final int streak;
+  final int dailyGoal;
+  final int wordsToday;
+
+  const _JourneyDashboard({
+    required this.totalNotes,
+    required this.totalWords,
+    required this.streak,
+    required this.dailyGoal,
+    required this.wordsToday,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = (wordsToday / dailyGoal).clamp(0.0, 1.0);
+    
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: NoveColors.cardBg(context),
+        borderRadius: BorderRadius.circular(NoveRadii.xxl),
+        border: Border.all(color: NoveColors.cardBorder(context)),
+        boxShadow: NoveShadows.cardElevated(context),
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _StatItem(label: 'TOTAL NOTES', value: '$totalNotes', icon: Icons.description_outlined),
+              _StatItem(label: 'STREAK', value: '$streak', icon: Icons.local_fire_department_rounded, color: NoveColors.amberDark),
+              _StatItem(label: 'WORDS', value: '$totalWords', icon: Icons.edit_note_rounded, color: NoveColors.accent(context)),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('DAILY GOAL', style: NoveTypography.label(context)),
+                  Text('${(progress * 100).toInt()}%', style: NoveTypography.label(context).copyWith(color: NoveColors.accent(context))),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(NoveRadii.full),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 8,
+                  backgroundColor: NoveColors.bg(context),
+                  valueColor: AlwaysStoppedAnimation<Color>(NoveColors.accent(context)),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text('$wordsToday / $dailyGoal words today', style: NoveTypography.caption(context)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatItem extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color? color;
+
+  const _StatItem({required this.label, required this.value, required this.icon, this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, color: color ?? NoveColors.secondaryText(context), size: 20),
+        const SizedBox(height: 8),
+        Text(value, style: NoveTypography.h3(context).copyWith(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 2),
+        Text(label, style: NoveTypography.label(context).copyWith(fontSize: 9)),
+      ],
+    );
   }
 }

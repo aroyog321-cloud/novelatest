@@ -146,11 +146,7 @@ class _MinimizedPillState extends ConsumerState<_MinimizedPill>
               borderRadius: BorderRadius.circular(30),
               boxShadow: [
                 BoxShadow(
-<<<<<<< HEAD
                   color: bgColor.withValues(alpha: 0.55),
-=======
-                  color: bgColor.withOpacity(0.55),
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
                   blurRadius: 14,
                   offset: const Offset(0, 5),
                 ),
@@ -318,13 +314,8 @@ class _FullStickyCardState extends ConsumerState<_FullStickyCard>
               boxShadow: [
                 BoxShadow(
                   color: _isDragging
-<<<<<<< HEAD
                       ? bgColor.withValues(alpha: 0.55)
                       : Colors.black.withValues(alpha: 0.18),
-=======
-                      ? bgColor.withOpacity(0.55)
-                      : Colors.black.withOpacity(0.18),
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
                   blurRadius: _isDragging ? 28 : 18,
                   offset: Offset(0, _isDragging ? 10 : 6),
                   spreadRadius: _isDragging ? 2 : 0,
@@ -340,11 +331,7 @@ class _FullStickyCardState extends ConsumerState<_FullStickyCard>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-<<<<<<< HEAD
                     color: Colors.black.withValues(alpha: 0.07),
-=======
-                    color: Colors.black.withOpacity(0.07),
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(18),
                       topRight: Radius.circular(18),
@@ -365,11 +352,7 @@ class _FullStickyCardState extends ConsumerState<_FullStickyCard>
                                 width: 4,
                                 height: 4,
                                 decoration: BoxDecoration(
-<<<<<<< HEAD
                                   color: textColor.withValues(alpha: 0.35),
-=======
-                                  color: textColor.withOpacity(0.35),
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
                                   shape: BoxShape.circle,
                                 ),
                               ),
@@ -385,11 +368,7 @@ class _FullStickyCardState extends ConsumerState<_FullStickyCard>
                                 width: 4,
                                 height: 4,
                                 decoration: BoxDecoration(
-<<<<<<< HEAD
                                   color: textColor.withValues(alpha: 0.35),
-=======
-                                  color: textColor.withOpacity(0.35),
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
                                   shape: BoxShape.circle,
                                 ),
                               ),
@@ -404,11 +383,7 @@ class _FullStickyCardState extends ConsumerState<_FullStickyCard>
                           style: GoogleFonts.dmSans(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-<<<<<<< HEAD
                             color: textColor.withValues(alpha: 0.55),
-=======
-                            color: textColor.withOpacity(0.55),
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
                             letterSpacing: 0.5,
                           ),
                         ),
@@ -418,11 +393,7 @@ class _FullStickyCardState extends ConsumerState<_FullStickyCard>
                         icon: Icons.remove_rounded,
                         tooltip: 'Minimize',
                         color: textColor,
-<<<<<<< HEAD
                         bgColor: Colors.black.withValues(alpha: 0.08),
-=======
-                        bgColor: Colors.black.withOpacity(0.08),
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
                         onTap: _minimize,
                       ),
                       const SizedBox(width: 6),
@@ -431,11 +402,7 @@ class _FullStickyCardState extends ConsumerState<_FullStickyCard>
                         icon: Icons.dashboard_customize_rounded,
                         tooltip: 'Send to Board',
                         color: textColor,
-<<<<<<< HEAD
                         bgColor: Colors.black.withValues(alpha: 0.08),
-=======
-                        bgColor: Colors.black.withOpacity(0.08),
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
                         onTap: _sendToBoard,
                       ),
                     ],
@@ -465,11 +432,7 @@ class _FullStickyCardState extends ConsumerState<_FullStickyCard>
                           widget.entry.note.content,
                           style: GoogleFonts.caveat(
                             fontSize: 22,
-<<<<<<< HEAD
                             color: textColor.withValues(alpha: 0.85),
-=======
-                            color: textColor.withOpacity(0.85),
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
                             height: 1.4,
                           ),
                           maxLines: 8,
@@ -486,21 +449,13 @@ class _FullStickyCardState extends ConsumerState<_FullStickyCard>
                   child: Row(
                     children: [
                       Icon(Icons.open_with_rounded,
-<<<<<<< HEAD
                           size: 11, color: textColor.withValues(alpha: 0.4)),
-=======
-                          size: 11, color: textColor.withOpacity(0.4)),
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
                       const SizedBox(width: 4),
                       Text(
                         'Drag to move',
                         style: GoogleFonts.dmSans(
                           fontSize: 10,
-<<<<<<< HEAD
                           color: textColor.withValues(alpha: 0.4),
-=======
-                          color: textColor.withOpacity(0.4),
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
                         ),
                       ),
                     ],

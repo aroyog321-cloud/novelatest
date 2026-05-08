@@ -20,6 +20,9 @@ class StickyNote {
   final StickyColor color;
   final int createdAt;
   final LinkedApp? linkedApp;
+  final double x;
+  final double y;
+  final bool isDeleted;
 
   const StickyNote({
     required this.id,
@@ -28,6 +31,9 @@ class StickyNote {
     required this.color,
     required this.createdAt,
     this.linkedApp,
+    this.x = 0,
+    this.y = 0,
+    this.isDeleted = false,
   });
 
   StickyNote copyWith({
@@ -37,7 +43,10 @@ class StickyNote {
     StickyColor? color,
     int? createdAt,
     LinkedApp? linkedApp,
+    double? x,
+    double? y,
     bool clearLink = false,
+    bool? isDeleted,
   }) {
     return StickyNote(
       id: id ?? this.id,
@@ -46,6 +55,9 @@ class StickyNote {
       color: color ?? this.color,
       createdAt: createdAt ?? this.createdAt,
       linkedApp: clearLink ? null : (linkedApp ?? this.linkedApp),
+      x: x ?? this.x,
+      y: y ?? this.y,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 
@@ -57,6 +69,9 @@ class StickyNote {
       'color': color.name,
       'created_at': createdAt,
       'linked_app': linkedApp?.toMap(),
+      'x': x,
+      'y': y,
+      'is_deleted': isDeleted ? 1 : 0,
     };
   }
 
@@ -73,6 +88,9 @@ class StickyNote {
       linkedApp: map['linked_app'] != null 
           ? LinkedApp.fromMap(Map<String, dynamic>.from(map['linked_app'])) 
           : null,
+      x: (map['x'] as num?)?.toDouble() ?? 0.0,
+      y: (map['y'] as num?)?.toDouble() ?? 0.0,
+      isDeleted: map['is_deleted'] == 1 || map['is_deleted'] == true || map['is_deleted'] == '1',
     );
   }
 }

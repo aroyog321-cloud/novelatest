@@ -3,12 +3,10 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
-<<<<<<< HEAD
   file_selector_windows
-=======
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
   local_auth_windows
   permission_handler_windows
+  printing
   share_plus
   url_launcher_windows
 )

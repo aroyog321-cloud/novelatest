@@ -56,6 +56,14 @@ class StickyNotesNotifier extends StateNotifier<List<StickyNote>> {
     await _save();
   }
 
+  Future<void> updateNotePosition(String id, double x, double y) async {
+    state = state.map((n) {
+      if (n.id == id) return n.copyWith(x: x, y: y);
+      return n;
+    }).toList();
+    await _save();
+  }
+
   bool isPinned(String id) => _pinnedIds.contains(id);
 
   Future<void> togglePin(String id) async {

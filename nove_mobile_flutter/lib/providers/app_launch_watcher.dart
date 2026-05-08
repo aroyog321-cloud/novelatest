@@ -27,7 +27,6 @@ class AppLaunchWatcher {
 
   void _initWatcher() {
     // 2. Listen to the shared broadcast stream instead of opening a new one
-<<<<<<< HEAD
     _subscription = _sharedAppLaunchStream.listen((event) async {
       final eventStr = event.toString();
 
@@ -82,45 +81,6 @@ class AppLaunchWatcher {
         } catch (e) {
           debugPrint("Auto-Launch Overlay Error: $e");
         }
-=======
-    _subscription = _sharedAppLaunchStream.listen((packageName) async {
-      final notes = ref.read(stickyNotesProvider);
-      
-      StickyNote? linkedNote;
-      try {
-        linkedNote = notes.firstWhere((note) => note.linkedApp == packageName);
-      } catch (_) {
-        return; 
-      }
-
-      try {
-        final data = jsonEncode({
-          'id': linkedNote.id,
-          'title': linkedNote.title,
-          'content': linkedNote.content,
-          'color': _getColorValue(linkedNote.color),
-          'isBubble': true, 
-        });
-
-        bool isActive = await FlutterOverlayWindow.isActive();
-        if (!isActive) {
-          await FlutterOverlayWindow.showOverlay(
-            enableDrag: true,
-            height: 100,
-            width: 100,
-            alignment: OverlayAlignment.centerRight,
-          );
-          await Future.delayed(const Duration(milliseconds: 400));
-        } else {
-          await FlutterOverlayWindow.resizeOverlay(100, 100, true);
-        }
-        
-        await FlutterOverlayWindow.shareData("note:$data");
-        ref.read(poppedOutNoteProvider.notifier).state = linkedNote;
-        
-      } catch (e) {
-        debugPrint("Auto-Launch Overlay Error: $e");
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
       }
     }, onError: (e) {
       debugPrint("AppLaunch Stream Error: $e");

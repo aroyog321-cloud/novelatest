@@ -7,13 +7,13 @@ import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'dart:convert';
 import 'dart:ui';
 import 'dart:async';
+import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'services/database_service.dart';
 import 'screens/home_screen.dart';
-<<<<<<< HEAD
-import 'screens/editor_screen.dart';
-=======
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
+
 import 'screens/sticky_board_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -148,15 +148,9 @@ class _OSFloatingCompanionState extends State<OSFloatingCompanion> {
           color: _bgColor,
           shape: BoxShape.circle,
           boxShadow: [
-<<<<<<< HEAD
             BoxShadow(color: _bgColor.withValues(alpha: 0.4), blurRadius: 15, spreadRadius: 2),
           ],
           border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1),
-=======
-            BoxShadow(color: _bgColor.withOpacity(0.4), blurRadius: 15, spreadRadius: 2),
-          ],
-          border: Border.all(color: Colors.white.withOpacity(0.3), width: 1),
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
         ),
         child: const Center(
           child: Icon(Icons.edit_note_rounded, color: Color(0xFF412402), size: 28),
@@ -174,11 +168,7 @@ class _OSFloatingCompanionState extends State<OSFloatingCompanion> {
       decoration: BoxDecoration(
         boxShadow: [
           BoxShadow(
-<<<<<<< HEAD
             color: Colors.black.withValues(alpha: 0.15), 
-=======
-            color: Colors.black.withOpacity(0.15), 
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
             blurRadius: 32, 
             offset: const Offset(0, 12)
           ),
@@ -255,11 +245,7 @@ class _OSFloatingCompanionState extends State<OSFloatingCompanion> {
                     Container(
                       padding: const EdgeInsets.only(top: 8),
                       decoration: BoxDecoration(
-<<<<<<< HEAD
                         border: Border(top: BorderSide(color: Colors.black.withValues(alpha: 0.05))),
-=======
-                        border: Border(top: BorderSide(color: Colors.black.withOpacity(0.05))),
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.end,
@@ -295,22 +281,14 @@ class _OSFloatingCompanionState extends State<OSFloatingCompanion> {
               width: foldSize,
               height: foldSize,
               decoration: BoxDecoration(
-<<<<<<< HEAD
                 color: Colors.white.withValues(alpha: 0.35),
-=======
-                color: Colors.white.withOpacity(0.35),
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
                 borderRadius: const BorderRadius.only(
                   bottomRight: Radius.circular(10), 
                   topLeft: Radius.circular(14),     
                 ),
                 boxShadow: [
                   BoxShadow(
-<<<<<<< HEAD
                     color: Colors.black.withValues(alpha: 0.1),
-=======
-                    color: Colors.black.withOpacity(0.1),
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
                     blurRadius: 4,
                     offset: const Offset(2, 2),
                   )
@@ -359,6 +337,14 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
 // ─── Entry Point ─────────────────────────────────────────────────────────────
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize notifications & timezone
+  tz.initializeTimeZones();
+  final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+  const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -641,19 +627,11 @@ class _NoveTabBar extends StatelessWidget {
     ];
 
     final bgColor = isDark 
-<<<<<<< HEAD
         ? NoveColors.cardDark.withValues(alpha: 0.7) 
         : const Color(0xFFFCF9F3).withValues(alpha: 0.85);
     final borderColor = isDark 
         ? NoveColors.warmGray800.withValues(alpha: 0.5) 
         : NoveColors.warmGray200.withValues(alpha: 0.5);
-=======
-        ? NoveColors.cardDark.withOpacity(0.7) 
-        : const Color(0xFFFCF9F3).withOpacity(0.85);
-    final borderColor = isDark 
-        ? NoveColors.warmGray800.withOpacity(0.5) 
-        : NoveColors.warmGray200.withOpacity(0.5);
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
     final inactiveColor = isDark ? NoveColors.warmGray500 : NoveColors.warmGray500;
 
     return Padding(
@@ -669,11 +647,7 @@ class _NoveTabBar extends StatelessWidget {
               border: Border.all(color: borderColor, width: 0.5),
               boxShadow: [
                 BoxShadow(
-<<<<<<< HEAD
                   color: Colors.black.withValues(alpha: 0.05),
-=======
-                  color: Colors.black.withOpacity(0.05),
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),

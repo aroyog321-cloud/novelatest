@@ -12,6 +12,9 @@ class Note {
   final int wordCount;
   final int charCount;
   final double readTimeMinutes;
+  final int? reminder;
+  final List<String> tags;
+  final bool isDeleted;
 
   Note({
     required this.id,
@@ -26,6 +29,9 @@ class Note {
     required this.wordCount,
     required this.charCount,
     required this.readTimeMinutes,
+    this.reminder,
+    this.tags = const [],
+    this.isDeleted = false,
   });
 
   factory Note.fromMap(Map<String, dynamic> map) {
@@ -42,6 +48,9 @@ class Note {
       wordCount: (map['word_count'] as num?)?.toInt() ?? 0,
       charCount: (map['char_count'] as num?)?.toInt() ?? 0,
       readTimeMinutes: (map['read_time_minutes'] as num?)?.toDouble() ?? 0.0,
+      reminder: map['reminder'] != null ? (map['reminder'] as num).toInt() : null,
+      tags: List<String>.from(map['tags'] ?? []),
+      isDeleted: map['is_deleted'] == 1 || map['is_deleted'] == true || map['is_deleted'] == '1',
     );
   }
 
@@ -61,6 +70,9 @@ class Note {
       'word_count': wordCount,
       'char_count': charCount,
       'read_time_minutes': readTimeMinutes,
+      'reminder': reminder,
+      'tags': tags,
+      'is_deleted': isDeleted ? 1 : 0,
     };
   }
 
@@ -79,6 +91,9 @@ class Note {
     int? wordCount,
     int? charCount,
     double? readTimeMinutes,
+    int? reminder,
+    List<String>? tags,
+    bool? isDeleted,
   }) {
     return Note(
       id: id ?? this.id,
@@ -93,6 +108,9 @@ class Note {
       wordCount: wordCount ?? this.wordCount,
       charCount: charCount ?? this.charCount,
       readTimeMinutes: readTimeMinutes ?? this.readTimeMinutes,
+      reminder: reminder ?? this.reminder,
+      tags: tags ?? this.tags,
+      isDeleted: isDeleted ?? this.isDeleted,
     );
   }
 }

@@ -3,8 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-<<<<<<< HEAD
 import 'package:share_plus/share_plus.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../models/note.dart';
 import '../providers/notes_provider.dart';
@@ -14,19 +14,6 @@ import '../theme/tokens.dart';
 import 'editor_screen.dart';
 
 enum _SortOrder { updatedDesc, updatedAsc, titleAsc, titleDesc, wordCountDesc }
-
-
-=======
-import 'dart:ui';
-import '../models/note.dart';
-import '../providers/notes_provider.dart';
-import '../theme/tokens.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'editor_screen.dart' show loadAllCategories;
-import 'editor_screen.dart';
-
-const _coreCategories = ['All', '★ Starred'];
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -40,17 +27,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _scrollController = ScrollController();
   String _selectedCategory = 'All';
   bool _isSearching = false;
-<<<<<<< HEAD
   _SortOrder _sortOrder = _SortOrder.updatedDesc;
   List<String> _categories = ['All', 'Work', 'Ideas', 'Personal', 'Urgent', '★ Starred'];
 
   int _streak = 0;
   int _wordsToday = 0;
+  final Set<String> _selectedNoteIds = {};
+  bool _isSelectionMode = false;
 
-=======
-  List<String> _categories = ['All', 'Work', 'Ideas', 'Personal', 'Urgent', '★ Starred'];
-
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
   @override
   void initState() {
     super.initState();
@@ -58,7 +42,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ref.read(notesProvider.notifier).loadNotes();
     });
     _refreshCategories();
-<<<<<<< HEAD
     _loadStats();
   }
 
@@ -74,12 +57,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Future<void> _refreshCategories() async {
     final custom = await CategoryService.loadAllCategories();
-=======
-  }
-
-  Future<void> _refreshCategories() async {
-    final custom = await loadAllCategories();
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
     if (mounted) {
       setState(() {
         _categories = ['All', ...custom, '★ Starred'];
@@ -103,19 +80,55 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   void _openNote(Note note) {
+    if (_isSelectionMode) {
+      _toggleNoteSelection(note.id);
+      return;
+    }
     HapticFeedback.lightImpact();
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => EditorScreen(note: note)),
-<<<<<<< HEAD
     ).then((_) {
       ref.read(notesProvider.notifier).loadNotes();
       _refreshCategories();
       _loadStats();
     });
-=======
-    ).then((_) => ref.read(notesProvider.notifier).loadNotes());
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
+  }
+
+  void _toggleNoteSelection(String id) {
+    HapticFeedback.selectionClick();
+    setState(() {
+      if (_selectedNoteIds.contains(id)) {
+        _selectedNoteIds.remove(id);
+        if (_selectedNoteIds.isEmpty) _isSelectionMode = false;
+      } else {
+        _selectedNoteIds.add(id);
+        _isSelectionMode = true;
+      }
+    });
+  }
+
+  void _clearSelection() {
+    setState(() {
+      _selectedNoteIds.clear();
+      _isSelectionMode = false;
+    });
+  }
+
+  Future<void> _bulkDelete() async {
+    final ids = _selectedNoteIds.toList();
+    for (final id in ids) {
+      await ref.read(notesProvider.notifier).deleteNote(id);
+    }
+    _clearSelection();
+  }
+
+  Future<void> _bulkPin() async {
+    final ids = _selectedNoteIds.toList();
+    for (final id in ids) {
+      await ref.read(notesProvider.notifier).togglePin(id);
+    }
+    _clearSelection();
   }
 
   void _createNote() {
@@ -123,7 +136,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const EditorScreen()),
-<<<<<<< HEAD
     ).then((_) {
       ref.read(notesProvider.notifier).loadNotes();
       _refreshCategories();
@@ -131,69 +143,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
   }
 
-  List<Note> _getFilteredNotes(List<Note> notes) {
+  List<Note> _getFilteredNotes(List<Note> notes, String? selectedTag) {
     List<Note> filtered;
     if (_selectedCategory == 'All') {
       filtered = List.from(notes);
     } else if (_selectedCategory == '★ Starred') {
       filtered = notes.where((n) => n.isFavorite).toList();
     } else {
-      filtered = notes
-          .where((n) =>
-              (n.category ?? '').toLowerCase() ==
-              _selectedCategory.toLowerCase())
-          .toList();
+      filtered = notes.where((n) => (n.category ?? '').toLowerCase() == _selectedCategory.toLowerCase()).toList();
     }
 
-    // Apply sort
-    switch (_sortOrder) {
-      case _SortOrder.updatedDesc:
-        filtered.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-        break;
-      case _SortOrder.updatedAsc:
-        filtered.sort((a, b) => a.updatedAt.compareTo(b.updatedAt));
-        break;
-      case _SortOrder.titleAsc:
-        filtered.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
-        break;
-      case _SortOrder.titleDesc:
-        filtered.sort((a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()));
-        break;
-      case _SortOrder.wordCountDesc:
-        filtered.sort((a, b) => b.wordCount.compareTo(a.wordCount));
-        break;
+    if (selectedTag != null) {
+      filtered = filtered.where((n) => n.tags.contains(selectedTag)).toList();
     }
+    filtered.sort((a, b) {
+      // Always prioritize pinned notes at the top
+      if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+
+      // Secondary sort based on user preference
+      switch (_sortOrder) {
+        case _SortOrder.updatedDesc: return b.updatedAt.compareTo(a.updatedAt);
+        case _SortOrder.updatedAsc: return a.updatedAt.compareTo(b.updatedAt);
+        case _SortOrder.titleAsc: return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+        case _SortOrder.titleDesc: return b.title.toLowerCase().compareTo(a.title.toLowerCase());
+        case _SortOrder.wordCountDesc: return b.wordCount.compareTo(a.wordCount);
+      }
+    });
     return filtered;
-=======
-    ).then((_) => ref.read(notesProvider.notifier).loadNotes());
-  }
-
-  List<Note> _getFilteredNotes(List<Note> notes) {
-    if (_selectedCategory == 'All') return notes;
-    if (_selectedCategory == '★ Starred') {
-      return notes.where((n) => n.isFavorite).toList();
-    }
-    return notes
-        .where((n) =>
-            (n.category ?? '').toLowerCase() ==
-            _selectedCategory.toLowerCase())
-        .toList();
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
   }
 
   Map<String, int> _getCategoryCounts(List<Note> notes) {
     final counts = <String, int>{};
     for (final cat in _categories) {
-      if (cat == 'All') {
-        counts[cat] = notes.length;
-      } else if (cat == '★ Starred') {
-        counts[cat] = notes.where((n) => n.isFavorite).length;
-      } else {
-        counts[cat] = notes
-            .where((n) =>
-                (n.category ?? '').toLowerCase() == cat.toLowerCase())
-            .length;
-      }
+      if (cat == 'All') counts[cat] = notes.length;
+      else if (cat == '★ Starred') counts[cat] = notes.where((n) => n.isFavorite).length;
+      else counts[cat] = notes.where((n) => (n.category ?? '').toLowerCase() == cat.toLowerCase()).length;
     }
     return counts;
   }
@@ -209,592 +193,155 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final notesState = ref.watch(notesProvider);
-    final filteredNotes = _getFilteredNotes(notesState.notes);
+    final filteredNotes = _getFilteredNotes(notesState.notes, notesState.selectedTag);
     final counts = _getCategoryCounts(notesState.notes);
-    final totalNotes = notesState.notes.length;
-    final pinnedNotes = notesState.notes.where((n) => n.isPinned).length;
 
     return Scaffold(
       backgroundColor: NoveColors.bg(context),
       body: SafeArea(
-        bottom: false, // Allow scrolling to the very bottom
+        bottom: false,
         child: CustomScrollView(
           controller: _scrollController,
           slivers: [
-            // ── Header (Collapses when scrolling) ───────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Greeting + search toggle
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          _getGreeting(),
-                          style: NoveTypography.bodySm(context).copyWith(
-                            fontWeight: NoveTypography.medium,
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+                child: AnimatedContainer(
+                  duration: NoveAnimation.fast,
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: _isSelectionMode ? NoveColors.accent(context).withValues(alpha: 0.1) : NoveColors.cardBg(context),
+                    borderRadius: BorderRadius.circular(NoveRadii.xxl),
+                    border: Border.all(color: _isSelectionMode ? NoveColors.accent(context) : NoveColors.cardBorder(context), width: _isSelectionMode ? 2 : 1),
+                    boxShadow: NoveShadows.cardElevated(context),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(_isSelectionMode ? 'Selection Mode' : _getGreeting(), style: NoveTypography.bodySm(context).copyWith(color: NoveColors.accent(context), fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 4),
+                              Text(_isSelectionMode ? '${_selectedNoteIds.length} Selected' : 'Ready to write?', style: NoveTypography.h1(context)),
+                            ],
                           ),
-                        ),
+                          if (_isSelectionMode)
+                            Row(
+                              children: [
+                                _IconBtn(icon: Icons.push_pin_rounded, onTap: _bulkPin, isDark: isDark),
+                                const SizedBox(width: 8),
+                                _IconBtn(icon: Icons.delete_rounded, onTap: _bulkDelete, isDark: isDark),
+                                const SizedBox(width: 8),
+                                _IconBtn(icon: Icons.close_rounded, onTap: _clearSelection, isDark: isDark),
+                              ],
+                            )
+                          else
+                            _IconBtn(icon: _isSearching ? Icons.close_rounded : Icons.search_rounded, onTap: () { setState(() { _isSearching = !_isSearching; if (!_isSearching) { _searchController.clear(); ref.read(notesProvider.notifier).loadNotes(); } }); }, isDark: isDark),
+                        ],
+                      ),
+                      if (!_isSelectionMode) ...[
+                        const SizedBox(height: 24),
                         Row(
                           children: [
-                            _IconBtn(
-                              icon: _isSearching
-                                  ? Icons.close_rounded
-                                  : Icons.search_rounded,
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                setState(() {
-                                  _isSearching = !_isSearching;
-                                  if (!_isSearching) {
-                                    _searchController.clear();
-                                    ref.read(notesProvider.notifier).loadNotes();
-                                  }
-                                });
-                              },
-                              isDark: isDark,
-                            ),
-                            const SizedBox(width: 8),
-                            _IconBtn(
-                              icon: Icons.sort_rounded,
-                              onTap: () {
-                                HapticFeedback.lightImpact();
-                                _showSortSheet(context);
-                              },
-                              isDark: isDark,
-                            ),
+                            Expanded(child: _BentoStat(label: 'Notes', value: '${notesState.notes.length}', icon: Icons.description_outlined)),
+                            const SizedBox(width: 12),
+                            Expanded(child: _BentoStat(label: 'Streak', value: '$_streak', icon: Icons.local_fire_department_rounded)),
                           ],
                         ),
                       ],
-                    ),
-                    const SizedBox(height: 4),
-
-                    // Title
-                    Text(
-                      'My Notes',
-                      style: NoveTypography.h1(context),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-
-            // ── Search bar (expandable) ─────────────────────────────
             SliverToBoxAdapter(
               child: AnimatedContainer(
                 duration: NoveAnimation.fast,
                 height: _isSearching ? 64 : 0,
-                child: _isSearching
-                    ? Padding(
-                        padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: NoveColors.inputBg(context),
-                            borderRadius: BorderRadius.circular(NoveRadii.lg),
-                            boxShadow: NoveShadows.cardLight(context),
-                          ),
-                          child: TextField(
-                            controller: _searchController,
-                            autofocus: true,
-                            onChanged: _onSearch,
-                            style: NoveTypography.body(context),
-                            decoration: InputDecoration(
-                              hintText: 'Search your notes...',
-                              hintStyle: NoveTypography.body(context).copyWith(
-                                color: NoveColors.mutedText(context),
-                              ),
-                              prefixIcon: Icon(Icons.search,
-                                  color: NoveColors.mutedText(context)),
-                              border: InputBorder.none,
-                              contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 14),
-                            ),
-                          ),
-                        ),
-                      )
-                    : const SizedBox.shrink(),
+                child: _isSearching ? Padding(padding: const EdgeInsets.fromLTRB(24, 0, 24, 16), child: Container(decoration: BoxDecoration(color: NoveColors.inputBg(context), borderRadius: BorderRadius.circular(NoveRadii.lg)), child: TextField(controller: _searchController, autofocus: true, onChanged: _onSearch, decoration: const InputDecoration(hintText: 'Search your thoughts...', prefixIcon: Icon(Icons.search), border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14))))) : const SizedBox.shrink(),
               ),
             ),
-
-            // ── Stats row ──────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: _isSearching
-                  ? const SizedBox(height: 16)
-                  : Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: StatCard(
-                              label: 'Total notes',
-                              value: totalNotes,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: StatCard(
-<<<<<<< HEAD
-                              label: 'Streak 🔥',
-                              value: _streak,
-=======
-                              label: 'Pinned',
-                              value: pinnedNotes,
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: StatCard(
-<<<<<<< HEAD
-                              label: 'Words today',
-                              value: _wordsToday,
-=======
-                              label: 'Starred',
-                              value: notesState.notes.where((n) => n.isFavorite).length,
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-            ),
-
-            // ── Sticky Category Chips ──────────────────────────────
             SliverPersistentHeader(
               pinned: true,
-              delegate: _CategoryHeaderDelegate(
-                child: Container(
-                  color: NoveColors.bg(context).withValues(alpha: 0.95), // Slight blur/transparency effect
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 8, bottom: 8),
-                    child: CategoryFilterBar(
-                      categories: _categories,
-                      counts: counts,
-                      selectedCategory: _selectedCategory,
-                      onSelect: (cat) {
-                        HapticFeedback.selectionClick();
-                        setState(() => _selectedCategory = cat);
-                      },
-                    ),
+              delegate: _CategoryHeaderDelegate(child: Container(color: NoveColors.bg(context).withValues(alpha: 0.95), child: Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: CategoryFilterBar(categories: _categories, counts: counts, selectedCategory: _selectedCategory, onSelect: (cat) => setState(() => _selectedCategory = cat))))),
+            ),
+            if (notesState.allTags.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: TagFilterBar(
+                    tags: notesState.allTags,
+                    selectedTag: notesState.selectedTag,
+                    onSelect: (tag) => ref.read(notesProvider.notifier).selectTag(tag),
                   ),
+                ),
+              ),
+            if (notesState.isLoading) const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+            else if (notesState.error != null) SliverFillRemaining(child: Center(child: Padding(padding: const EdgeInsets.all(32), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(Icons.error_outline, size: 48, color: NoveColors.error), const SizedBox(height: 16), Text('Failed to load notes', style: NoveTypography.h3(context)), const SizedBox(height: 8), Text(notesState.error!, textAlign: TextAlign.center, style: NoveTypography.bodySm(context).copyWith(color: NoveColors.mutedText(context))), const SizedBox(height: 24), ElevatedButton(onPressed: () => ref.read(notesProvider.notifier).loadNotes(), child: const Text('Try Again'))]))))
+            else if (filteredNotes.isEmpty) SliverFillRemaining(child: EnhancedEmptyState(state: _isSearching ? EmptyStateType.search : EmptyStateType.onboarding, onAction: _createNote))
+            else SliverPadding(
+              padding: const EdgeInsets.fromLTRB(24, 8, 24, 120),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final note = filteredNotes[index];
+                    return NoteCard(
+                      note: note,
+                      onTap: () => _isSelectionMode ? _toggleNoteSelection(note.id) : _openNote(note),
+                      onDelete: () => ref.read(notesProvider.notifier).deleteNote(note.id),
+                      onPin: () => ref.read(notesProvider.notifier).togglePin(note.id),
+                      onFavorite: () => ref.read(notesProvider.notifier).toggleFavorite(note.id),
+                      onColorChange: (color) => ref.read(notesProvider.notifier).updateNote(note.id, colorLabel: color),
+                      isSelected: _selectedNoteIds.contains(note.id),
+                      onLongPress: () => _toggleNoteSelection(note.id),
+                      searchQuery: _searchController.text,
+                    );
+                  },
+                  childCount: filteredNotes.length,
                 ),
               ),
             ),
-
-            // ── Notes List ─────────────────────────────────────────
-            if (notesState.isLoading)
-              SliverFillRemaining(
-                child: Center(
-                  child: CircularProgressIndicator(
-                    color: NoveColors.accent(context),
-                    strokeWidth: 2,
-                  ),
-                ),
-              )
-            else if (filteredNotes.isEmpty)
-              SliverFillRemaining(
-                child: EnhancedEmptyState(
-                  state: _isSearching
-                      ? EmptyStateType.search
-                      : (_selectedCategory == 'All'
-                          ? EmptyStateType.onboarding
-                          : EmptyStateType.category),
-                  onAction: _isSearching
-                      ? () {
-                          setState(() {
-                            _isSearching = false;
-                            _searchController.clear();
-                            _onSearch('');
-                          });
-                        }
-                      : _createNote,
-                ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 120),
-                sliver: SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-<<<<<<< HEAD
-                      final pinnedList = filteredNotes.where((n) => n.isPinned).toList();
-                      final regularList = filteredNotes.where((n) => !n.isPinned).toList();
-                      final hasBothSections = pinnedList.isNotEmpty && regularList.isNotEmpty;
-
-                      // Build a combined list with section headers
-                      final combined = <dynamic>[];
-                      if (pinnedList.isNotEmpty) {
-                        combined.add('pinned_header');
-                        combined.addAll(pinnedList);
-                      }
-                      if (regularList.isNotEmpty) {
-                        if (hasBothSections) combined.add('others_header');
-                        combined.addAll(regularList);
-                      }
-
-                      final item = combined[index];
-                      if (item is String) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 16, bottom: 8),
-                          child: Text(
-                            item == 'pinned_header' ? 'Pinned' : 'Others',
-                            style: GoogleFonts.dmSans(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.8,
-                              color: NoveColors.mutedText(context),
-                            ),
-                          ),
-                        );
-                      }
-
-                      final note = item as Note;
-=======
-                      final note = filteredNotes[index];
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
-                      return NoteCard(
-                        note: note,
-                        onTap: () => _openNote(note),
-                        onDelete: () async {
-                          HapticFeedback.mediumImpact();
-                          await ref.read(notesProvider.notifier).deleteNote(note.id);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Note deleted', style: GoogleFonts.dmSans()),
-                                action: SnackBarAction(
-                                  label: 'Undo',
-                                  textColor: NoveColors.amber,
-                                  onPressed: () async {
-<<<<<<< HEAD
-                                    // Restore with all metadata preserved
-                                    await ref.read(notesProvider.notifier).createNote(
-                                      note.content,
-                                      title: note.title,
-                                      colorLabel: note.colorLabel,
-                                      category: note.category,
-                                      isPinned: note.isPinned,
-                                      isFavorite: note.isFavorite,
-                                    );
-=======
-                                    await ref.read(notesProvider.notifier).createNote(
-                                        note.content,
-                                        colorLabel: note.colorLabel,
-                                        category: note.category);
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
-                                  },
-                                ),
-                                duration: const Duration(seconds: 4),
-                              ),
-                            );
-                          }
-                        },
-                        onPin: () async {
-                          HapticFeedback.mediumImpact();
-                          await ref.read(notesProvider.notifier).togglePin(note.id);
-                        },
-                        onFavorite: () async {
-                          HapticFeedback.lightImpact();
-                          await ref.read(notesProvider.notifier).toggleFavorite(note.id);
-                        },
-                        onColorChange: (color) async {
-                          HapticFeedback.lightImpact();
-                          await ref.read(notesProvider.notifier).updateNote(note.id, colorLabel: color);
-                        },
-                      );
-                    },
-<<<<<<< HEAD
-                    childCount: (() {
-                      final pinnedList = filteredNotes.where((n) => n.isPinned).toList();
-                      final regularList = filteredNotes.where((n) => !n.isPinned).toList();
-                      final hasBothSections = pinnedList.isNotEmpty && regularList.isNotEmpty;
-                      int count = filteredNotes.length;
-                      if (pinnedList.isNotEmpty) count++; // pinned header
-                      if (hasBothSections) count++; // others header
-                      return count;
-                    })(),
-=======
-                    childCount: filteredNotes.length,
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
-                  ),
-                ),
-              ),
           ],
         ),
       ),
-      floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 84),
-        child: EnhancedFAB(
-          scrollController: _scrollController,
-          onPressed: _createNote,
-        ),
-      ),
+      floatingActionButton: Padding(padding: const EdgeInsets.only(bottom: 84), child: EnhancedFAB(scrollController: _scrollController, onPressed: _createNote)),
     );
   }
 
   void _showSortSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: NoveColors.cardBg(context),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-<<<<<<< HEAD
-      builder: (sheetCtx) => StatefulBuilder(
-        builder: (sheetCtx, setSheetState) => Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: NoveColors.warmGray300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text('Sort notes', style: NoveTypography.h3(context)),
-              const SizedBox(height: 8),
-              for (final entry in [
-                (_SortOrder.updatedDesc, 'Newest first', Icons.update_rounded),
-                (_SortOrder.updatedAsc, 'Oldest first', Icons.history_rounded),
-                (_SortOrder.titleAsc, 'A → Z', Icons.sort_by_alpha_rounded),
-                (_SortOrder.titleDesc, 'Z → A', Icons.sort_by_alpha_rounded),
-                (_SortOrder.wordCountDesc, 'Most words', Icons.article_outlined),
-              ])
-                ListTile(
-                  leading: Icon(entry.$3, size: 20,
-                      color: _sortOrder == entry.$1 ? NoveColors.accent(sheetCtx) : NoveColors.secondaryText(sheetCtx)),
-                  title: Text(entry.$2,
-                      style: NoveTypography.body(sheetCtx).copyWith(
-                        fontWeight: _sortOrder == entry.$1 ? NoveTypography.semiBold : NoveTypography.medium,
-                        color: _sortOrder == entry.$1 ? NoveColors.accent(sheetCtx) : NoveColors.primaryText(sheetCtx),
-                      )),
-                  trailing: _sortOrder == entry.$1
-                      ? Icon(Icons.check_rounded, size: 18, color: NoveColors.accent(sheetCtx))
-                      : null,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    setState(() => _sortOrder = entry.$1);
-                    Navigator.pop(sheetCtx);
-                  },
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              const SizedBox(height: 8),
-            ],
-          ),
-=======
-      builder: (_) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: NoveColors.warmGray300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Sort notes',
-              style: NoveTypography.h3(context),
-            ),
-            const SizedBox(height: 16),
-            for (final opt in [
-              'Newest first',
-              'Oldest first',
-              'A → Z',
-              'Most words',
-            ])
-              ListTile(
-                title: Text(opt, style: NoveTypography.body(context).copyWith(
-                  fontWeight: NoveTypography.medium,
-                )),
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  Navigator.pop(context);
-                },
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-            const SizedBox(height: 8),
-          ],
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
-        ),
-      ),
-    );
+    showModalBottomSheet(context: context, backgroundColor: NoveColors.cardBg(context), shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))), builder: (ctx) => Column(mainAxisSize: MainAxisSize.min, children: [
+      for (final entry in [(_SortOrder.updatedDesc, 'Newest first', Icons.update), (_SortOrder.updatedAsc, 'Oldest first', Icons.history), (_SortOrder.titleAsc, 'A-Z', Icons.sort_by_alpha), (_SortOrder.titleDesc, 'Z-A', Icons.sort_by_alpha), (_SortOrder.wordCountDesc, 'Most words', Icons.article)])
+        ListTile(leading: Icon(entry.$3), title: Text(entry.$2), onTap: () { setState(() => _sortOrder = entry.$1); Navigator.pop(ctx); }),
+    ]));
   }
 }
 
-// Delegate for Sticky Header
 class _CategoryHeaderDelegate extends SliverPersistentHeaderDelegate {
   final Widget child;
-
   _CategoryHeaderDelegate({required this.child});
-
-  @override
-  double get minExtent => 60.0;
-  @override
-  double get maxExtent => 60.0;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return child;
-  }
-
-  @override
-  bool shouldRebuild(_CategoryHeaderDelegate oldDelegate) {
-    return true;
-  }
+  @override double get minExtent => 60.0;
+  @override double get maxExtent => 60.0;
+  @override Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) => child;
+  @override bool shouldRebuild(_CategoryHeaderDelegate old) => true;
 }
 
 class _IconBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
   final bool isDark;
-
   const _IconBtn({required this.icon, required this.onTap, required this.isDark});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: NoveColors.cardBg(context),
-          borderRadius: BorderRadius.circular(NoveRadii.full),
-          border: Border.all(color: NoveColors.cardBorder(context), width: 0.5),
-        ),
-        child: Icon(icon, size: 18, color: NoveColors.secondaryText(context)),
-      ),
-    );
-  }
+  @override Widget build(BuildContext context) => GestureDetector(onTap: onTap, child: Container(width: 36, height: 36, decoration: BoxDecoration(color: NoveColors.cardBg(context), borderRadius: BorderRadius.circular(NoveRadii.full), border: Border.all(color: NoveColors.cardBorder(context), width: 0.5)), child: Icon(icon, size: 18, color: NoveColors.secondaryText(context))));
 }
 
-// ============================================================================
-// PHASE 2: COMPONENT REDESIGN (Preserved)
-// ============================================================================
-
-class StatCard extends StatefulWidget {
+class StatCard extends StatelessWidget {
   final String label;
   final int value;
-  final List<double>? sparklineData;
-
-  const StatCard({
-    super.key,
-    required this.label,
-    required this.value,
-    this.sparklineData,
-  });
-
-  @override
-  State<StatCard> createState() => _StatCardState();
-}
-
-class _StatCardState extends State<StatCard> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _scaleAnimation;
-  late Animation<int> _numberAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: NoveAnimation.entrance,
-      vsync: this,
-    );
-
-    _scaleAnimation = Tween<double>(begin: 0.9, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: NoveAnimation.bounce),
-    );
-
-    _setupNumberAnimation(0, widget.value);
-    _controller.forward();
-  }
-
-  @override
-  void didUpdateWidget(StatCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.value != widget.value) {
-      _setupNumberAnimation(oldWidget.value, widget.value);
-      _controller.forward(from: 0);
-    }
-  }
-
-  void _setupNumberAnimation(int begin, int end) {
-    _numberAnimation = IntTween(begin: begin, end: end).animate(
-      CurvedAnimation(parent: _controller, curve: NoveAnimation.smooth),
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ScaleTransition(
-      scale: _scaleAnimation,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-        decoration: BoxDecoration(
-          gradient: Theme.of(context).brightness == Brightness.dark
-              ? LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [NoveColors.cardDarkLight, NoveColors.cardDark],
-                )
-              : LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [NoveColors.warmGray50, NoveColors.warmWhite],
-                ),
-          borderRadius: BorderRadius.circular(NoveRadii.md),
-          border: Border.all(color: NoveColors.cardBorder(context), width: 1),
-          boxShadow: NoveShadows.cardLight(context),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.label.toUpperCase(),
-              style: NoveTypography.label(context),
-            ),
-            const SizedBox(height: 8),
-            AnimatedBuilder(
-              animation: _numberAnimation,
-              builder: (context, child) {
-                return Text(
-                  '${_numberAnimation.value}',
-                  style: NoveTypography.h1(context).copyWith(
-                    color: NoveColors.accent(context),
-                    height: 1.0,
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  const StatCard({super.key, required this.label, required this.value});
+  @override Widget build(BuildContext context) => Container(padding: const EdgeInsets.all(16), decoration: BoxDecoration(color: NoveColors.cardBg(context), borderRadius: BorderRadius.circular(NoveRadii.md), border: Border.all(color: NoveColors.cardBorder(context))), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(label.toUpperCase(), style: NoveTypography.label(context)), const SizedBox(height: 8), Text('$value', style: NoveTypography.h1(context).copyWith(color: NoveColors.accent(context)))]));
 }
 
 class CategoryFilterBar extends StatelessWidget {
@@ -802,221 +349,113 @@ class CategoryFilterBar extends StatelessWidget {
   final Map<String, int> counts;
   final String selectedCategory;
   final ValueChanged<String> onSelect;
-
-  const CategoryFilterBar({
-    super.key,
-    required this.categories,
-    required this.counts,
-    required this.selectedCategory,
-    required this.onSelect,
-  });
-
-  IconData _getCategoryIcon(String category) {
-    switch (category.toLowerCase()) {
-      case 'all': return Icons.apps_rounded;
-      case 'work': return Icons.work_outline_rounded;
-      case 'ideas': return Icons.lightbulb_outline_rounded;
-      case 'personal': return Icons.person_outline_rounded;
-      case 'urgent': return Icons.warning_amber_rounded;
-      case '★ starred': return Icons.star_border_rounded;
-      default: return Icons.folder_outlined;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      height: 44,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        itemCount: categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final cat = categories[index];
-          final isActive = selectedCategory == cat;
-          final count = counts[cat] ?? 0;
-
-          return GestureDetector(
-            onTap: () => onSelect(cat),
-            child: AnimatedContainer(
-              duration: NoveAnimation.fast,
-              curve: NoveAnimation.smooth,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: isActive ? NoveColors.accent(context) : NoveColors.cardBg(context),
-                borderRadius: BorderRadius.circular(NoveRadii.full),
-                border: Border.all(
-                  color: isActive ? Colors.transparent : NoveColors.cardBorder(context),
-                  width: 1,
-                ),
-                boxShadow: isActive ? NoveShadows.floating : [],
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _getCategoryIcon(cat),
-                    size: 16,
-                    color: isActive ? Colors.white : NoveColors.secondaryText(context),
-                  ),
+  const CategoryFilterBar({super.key, required this.categories, required this.counts, required this.selectedCategory, required this.onSelect});
+  @override Widget build(BuildContext context) => SizedBox(
+    height: 48, 
+    child: ListView.separated(
+      scrollDirection: Axis.horizontal, 
+      padding: const EdgeInsets.symmetric(horizontal: 24), 
+      itemCount: categories.length, 
+      separatorBuilder: (_, __) => const SizedBox(width: 10), 
+      itemBuilder: (ctx, i) {
+        final cat = categories[i];
+        final active = selectedCategory == cat;
+        return GestureDetector(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            onSelect(cat);
+          }, 
+          child: AnimatedContainer(
+            duration: NoveAnimation.fast,
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10), 
+            decoration: BoxDecoration(
+              color: active ? NoveColors.accent(context) : NoveColors.cardBg(context), 
+              borderRadius: BorderRadius.circular(NoveRadii.full), 
+              border: Border.all(color: active ? Colors.transparent : NoveColors.cardBorder(context), width: 1),
+              boxShadow: active ? NoveShadows.cardSmall(context) : null,
+            ), 
+            child: Row(
+              children: [
+                Text(cat, style: NoveTypography.body(context).copyWith(color: active ? Colors.white : NoveColors.primaryText(context), fontWeight: active ? FontWeight.bold : FontWeight.w500)),
+                if (counts[cat] != null && counts[cat]! > 0) ...[
                   const SizedBox(width: 6),
-                  Text(
-                    cat,
-                    style: NoveTypography.bodySm(context).copyWith(
-                      fontWeight: isActive ? NoveTypography.bold : NoveTypography.medium,
-                      color: isActive ? Colors.white : NoveColors.primaryText(context),
-                    ),
-                  ),
-                  if (count > 0) ...[
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: isActive ? Colors.white.withValues(alpha: 0.2) : NoveColors.inputBg(context),
-                        borderRadius: BorderRadius.circular(NoveRadii.xs),
-                      ),
-                      child: Text(
-                        '$count',
-                        style: NoveTypography.caption(context).copyWith(
-                          color: isActive ? Colors.white : NoveColors.mutedText(context),
-                          fontWeight: NoveTypography.bold,
-                        ),
-                      ),
-                    ),
-                  ]
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-enum EmptyStateType { onboarding, category, search }
-
-class EnhancedEmptyState extends StatefulWidget {
-  final EmptyStateType state;
-  final VoidCallback onAction;
-
-  const EnhancedEmptyState({
-    super.key,
-    required this.state,
-    required this.onAction,
-  });
-
-  @override
-  State<EnhancedEmptyState> createState() => _EnhancedEmptyStateState();
-}
-
-class _EnhancedEmptyStateState extends State<EnhancedEmptyState> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _slideAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      duration: NoveAnimation.slow,
-      vsync: this,
-    );
-
-    _slideAnimation = Tween<double>(begin: 20.0, end: 0.0).animate(
-      CurvedAnimation(parent: _controller, curve: NoveAnimation.smooth),
-    );
-
-    _controller.forward();
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  String get title {
-    switch (widget.state) {
-      case EmptyStateType.onboarding: return 'Capture your thoughts';
-      case EmptyStateType.category: return 'No notes here yet';
-      case EmptyStateType.search: return 'No matches found';
-    }
-  }
-
-  String get subtitle {
-    switch (widget.state) {
-      case EmptyStateType.onboarding: return 'Your secure, beautiful space for ideas.';
-      case EmptyStateType.category: return 'Tap below to add a note to this category.';
-      case EmptyStateType.search: return 'Try adjusting your search terms.';
-    }
-  }
-
-  IconData get icon {
-    switch (widget.state) {
-      case EmptyStateType.onboarding: return Icons.edit_document;
-      case EmptyStateType.category: return Icons.folder_open_rounded;
-      case EmptyStateType.search: return Icons.search_off_rounded;
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
-        return Transform.translate(
-          offset: Offset(0, _slideAnimation.value),
-          child: Opacity(
-            opacity: _controller.value,
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
                   Container(
-                    width: 80,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      color: NoveColors.cardBg(context),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: NoveColors.cardBorder(context), width: 1),
-                      boxShadow: NoveShadows.cardElevated(context),
-                    ),
-                    child: Icon(icon, size: 36, color: NoveColors.terracottaLight),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(color: active ? Colors.white.withOpacity(0.2) : NoveColors.accent(context).withOpacity(0.1), borderRadius: BorderRadius.circular(NoveRadii.full)),
+                    child: Text('${counts[cat]}', style: NoveTypography.caption(context).copyWith(color: active ? Colors.white : NoveColors.accent(context), fontWeight: FontWeight.bold, fontSize: 10)),
                   ),
-                  const SizedBox(height: 24),
-                  Text(title, style: NoveTypography.h2(context)),
-                  const SizedBox(height: 8),
-                  Text(
-                    subtitle,
-                    style: NoveTypography.body(context).copyWith(color: NoveColors.secondaryText(context)),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-                  if (widget.state != EmptyStateType.search)
-                    ElevatedButton.icon(
-                      onPressed: widget.onAction,
-                      icon: const Icon(Icons.add, color: Colors.white),
-                      label: Text('Create Note', style: NoveTypography.body(context).copyWith(color: Colors.white, fontWeight: NoveTypography.semiBold)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: NoveColors.accent(context),
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(NoveRadii.full)),
-                        elevation: 0,
-                      ),
-                    )
-                  else
-                    TextButton(
-                      onPressed: widget.onAction,
-                      child: Text('Clear Search', style: NoveTypography.body(context).copyWith(color: NoveColors.accent(context))),
-                    )
                 ],
-              ),
+              ],
             ),
           ),
         );
-      },
-    );
-  }
+      }
+    ),
+  );
+}
+
+class TagFilterBar extends StatelessWidget {
+  final List<String> tags;
+  final String? selectedTag;
+  final ValueChanged<String?> onSelect;
+  const TagFilterBar({super.key, required this.tags, this.selectedTag, required this.onSelect});
+  @override Widget build(BuildContext context) => SizedBox(
+    height: 40, 
+    child: ListView.separated(
+      scrollDirection: Axis.horizontal, 
+      padding: const EdgeInsets.symmetric(horizontal: 24), 
+      itemCount: tags.length + 1, 
+      separatorBuilder: (_, __) => const SizedBox(width: 10), 
+      itemBuilder: (ctx, i) {
+        if (i == 0) {
+          final active = selectedTag == null;
+          return GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              onSelect(null);
+            }, 
+            child: AnimatedContainer(
+              duration: NoveAnimation.fast,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), 
+              decoration: BoxDecoration(
+                color: active ? NoveColors.terracotta.withOpacity(0.1) : Colors.transparent, 
+                borderRadius: BorderRadius.circular(NoveRadii.full), 
+                border: Border.all(color: active ? NoveColors.terracotta : NoveColors.cardBorder(context), width: 1)
+              ), 
+              child: Text('All Tags', style: NoveTypography.caption(context).copyWith(color: active ? NoveColors.terracotta : NoveColors.secondaryText(context), fontWeight: active ? FontWeight.bold : FontWeight.normal))
+            ),
+          );
+        }
+        final tag = tags[i - 1];
+        final active = selectedTag == tag;
+        return GestureDetector(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onSelect(tag);
+          }, 
+          child: AnimatedContainer(
+            duration: NoveAnimation.fast,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), 
+            decoration: BoxDecoration(
+              color: active ? NoveColors.amber.withOpacity(0.15) : Colors.transparent, 
+              borderRadius: BorderRadius.circular(NoveRadii.full), 
+              border: Border.all(color: active ? NoveColors.amberDark : NoveColors.cardBorder(context), width: 1),
+              boxShadow: active ? [BoxShadow(color: NoveColors.amber.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))] : null,
+            ), 
+            child: Text('#$tag', style: NoveTypography.caption(context).copyWith(color: active ? NoveColors.amberDark : NoveColors.secondaryText(context), fontWeight: active ? FontWeight.bold : FontWeight.normal))
+          ),
+        );
+      }
+    ),
+  );
+}
+
+enum EmptyStateType { onboarding, category, search }
+class EnhancedEmptyState extends StatelessWidget {
+  final EmptyStateType state;
+  final VoidCallback onAction;
+  const EnhancedEmptyState({super.key, required this.state, required this.onAction});
+  @override Widget build(BuildContext context) => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [Icon(state == EmptyStateType.search ? Icons.search_off : Icons.edit_document, size: 64, color: NoveColors.terracottaLight), const SizedBox(height: 16), Text(state == EmptyStateType.search ? 'No matches' : 'Start writing', style: NoveTypography.h2(context)), const SizedBox(height: 32), ElevatedButton(onPressed: onAction, child: const Text('New Note'))]));
 }
 
 class NoteCard extends StatefulWidget {
@@ -1026,354 +465,112 @@ class NoteCard extends StatefulWidget {
   final VoidCallback onPin;
   final VoidCallback onFavorite;
   final ValueChanged<String> onColorChange;
-
-  const NoteCard({
-    super.key,
-    required this.note,
-    required this.onTap,
-    required this.onDelete,
-    required this.onPin,
-    required this.onFavorite,
-    required this.onColorChange,
-  });
-
-  @override
-  State<NoteCard> createState() => _NoteCardState();
+  final bool isSelected;
+  final VoidCallback? onLongPress;
+  final String searchQuery;
+  const NoteCard({super.key, required this.note, required this.onTap, required this.onDelete, required this.onPin, required this.onFavorite, required this.onColorChange, this.isSelected = false, this.onLongPress, this.searchQuery = ''});
+  @override State<NoteCard> createState() => _NoteCardState();
 }
 
 class _NoteCardState extends State<NoteCard> {
-  bool _isHovered = false;
+  static String _cleanPreview(String raw) => raw.replaceAll(RegExp(r'[#*`\[\]!()]'), '').trim().replaceAll(RegExp(r'\s+'), ' ');
+  Color _getLeftBorderColor(Note note) => note.colorLabel != '#FFFFFF' ? Color(int.parse(note.colorLabel.replaceFirst('#', '0xFF'))) : NoveColors.terracotta;
 
-<<<<<<< HEAD
-  /// Strips markdown syntax so card previews show clean plain text.
-  static String _cleanPreview(String raw) {
-    var text = raw;
-    // Remove fenced code blocks
-    text = text.replaceAll(RegExp(r'```[\s\S]*?```'), '');
-    // Remove headings markers
-    text = text.replaceAll(RegExp(r'^#{1,6}\s+', multiLine: true), '');
-    // Remove bold/italic markers
-    text = text.replaceAll(RegExp(r'\*\*(.+?)\*\*'), r'$1');
-    text = text.replaceAll(RegExp(r'_(.+?)_'), r'$1');
-    // Remove inline code
-    text = text.replaceAll(RegExp(r'`(.+?)`'), r'$1');
-    // Remove blockquote markers
-    text = text.replaceAll(RegExp(r'^>\s+', multiLine: true), '');
-    // Remove bullet/checkbox markers
-    text = text.replaceAll(RegExp(r'^[•\-☐☑]\s+', multiLine: true), '');
-    // Remove image tags
-    text = text.replaceAll(RegExp(r'!\[.*?\]\(.*?\)'), '');
-    // Collapse whitespace
-    return text.trim().replaceAll(RegExp(r'\n{2,}'), '\n').replaceAll('\n', ' ');
-  }
-
-  Color _getLeftBorderColor(Note note) {
-    if (note.colorLabel.isNotEmpty && note.colorLabel != '#FFFFFF') {
-      try {
-        return Color(int.parse(note.colorLabel.replaceFirst('#', '0xFF')));
-=======
-  Color _getLeftBorderColor(Note note) {
-    if (note.colorLabel != null && note.colorLabel!.isNotEmpty && note.colorLabel != '#FFFFFF') {
-      try {
-        return Color(int.parse(note.colorLabel!.replaceFirst('#', '0xFF')));
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
-      } catch (_) {}
-    }
-    switch (note.category?.toLowerCase()) {
-      case 'work': return NoveColors.deepBlue;
-      case 'ideas': return NoveColors.amber;
-      case 'urgent': return NoveColors.error;
-      case 'personal': return NoveColors.teal;
-    }
-    final colors = [
-      NoveColors.terracotta,
-      NoveColors.amber,
-      NoveColors.deepBlue,
-      NoveColors.teal,
-      NoveColors.coral,
-      NoveColors.success,
-    ];
-    return colors[note.id.hashCode.abs() % colors.length];
-  }
-
-  String _timeLabel() {
-    final now = DateTime.now();
-    final updated = DateTime.fromMillisecondsSinceEpoch(widget.note.updatedAt);
-    final diff = now.difference(updated);
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
-    if (diff.inDays < 1) return 'Today';
-    if (diff.inDays == 1) return 'Yesterday';
-    return DateFormat('MMM d').format(updated);
-  }
-
-  void _showContextMenu(BuildContext context) {
-    HapticFeedback.mediumImpact();
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: NoveColors.cardBg(context),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+  @override Widget build(BuildContext context) {
+    return Slidable(
+      key: Key(widget.note.id),
+      startActionPane: ActionPane(
+        motion: const ScrollMotion(),
+        children: [
+          SlidableAction(
+            onPressed: (_) => widget.onPin(),
+            backgroundColor: NoveColors.terracotta,
+            foregroundColor: Colors.white,
+            icon: Icons.push_pin,
+            label: 'Pin',
+            borderRadius: BorderRadius.circular(NoveRadii.lg),
+          ),
+        ],
       ),
-      builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Center(
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: NoveColors.warmGray300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  color: NoveColors.bg(context),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
+      endActionPane: ActionPane(
+        motion: const ScrollMotion(),
+        children: [
+          SlidableAction(
+            onPressed: (_) => widget.onDelete(),
+            backgroundColor: NoveColors.error,
+            foregroundColor: Colors.white,
+            icon: Icons.delete,
+            label: 'Delete',
+            borderRadius: BorderRadius.circular(NoveRadii.lg),
+          ),
+        ],
+      ),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onLongPress: widget.onLongPress,
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          decoration: BoxDecoration(
+            color: widget.isSelected ? NoveColors.accent(context).withValues(alpha: 0.1) : NoveColors.cardBg(context), 
+            borderRadius: BorderRadius.circular(NoveRadii.xl), 
+            border: Border.all(color: widget.isSelected ? NoveColors.accent(context) : NoveColors.cardBorder(context), width: widget.isSelected ? 2 : 1),
+            boxShadow: NoveShadows.cardLight(context),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20), 
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start, 
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween, 
                   children: [
-                    Expanded(
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _getLeftBorderColor(widget.note).withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(NoveRadii.full),
+                      ),
                       child: Text(
-                        widget.note.title.isNotEmpty ? widget.note.title : 'Untitled',
-                        style: GoogleFonts.lora(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: NoveColors.primaryText(context),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        widget.note.category?.toUpperCase() ?? 'GENERAL',
+                        style: NoveTypography.label(context).copyWith(color: _getLeftBorderColor(widget.note), fontWeight: FontWeight.bold),
                       ),
                     ),
-                    if (widget.note.isPinned)
-                      const Icon(Icons.push_pin,
-                          size: 14, color: NoveColors.terracotta),
+                    if (widget.note.isPinned) Icon(Icons.push_pin_rounded, size: 16, color: NoveColors.accent(context)),
                   ],
                 ),
-              ),
-              const SizedBox(height: 8),
-              _ContextAction(
-                icon: Icons.edit_outlined,
-                label: 'Edit note',
-                onTap: () {
-                  Navigator.pop(context);
-                  widget.onTap();
-                },
-              ),
-              _ContextAction(
-                icon: widget.note.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
-                label: widget.note.isPinned ? 'Unpin note' : 'Pin note',
-                onTap: () {
-                  Navigator.pop(context);
-                  widget.onPin();
-                },
-              ),
-              _ContextAction(
-                icon: widget.note.isFavorite ? Icons.star : Icons.star_outline,
-                label: widget.note.isFavorite ? 'Remove from starred' : 'Add to starred',
-                onTap: () {
-                  Navigator.pop(context);
-                  widget.onFavorite();
-                },
-              ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                child: Row(
+                const SizedBox(height: 12),
+                _HighlightedText(
+                  text: widget.note.title.isNotEmpty ? widget.note.title : 'Untitled', 
+                  query: widget.searchQuery, 
+                  style: NoveTypography.h3(context).copyWith(fontWeight: FontWeight.bold)
+                ),
+                const SizedBox(height: 6),
+                _HighlightedText(
+                  text: _cleanPreview(widget.note.content), 
+                  query: widget.searchQuery, 
+                  style: NoveTypography.body(context).copyWith(color: NoveColors.secondaryText(context)), 
+                  maxLines: 2
+                ),
+                const SizedBox(height: 12),
+                Row(
                   children: [
-                    const SizedBox(width: 12),
-                    Icon(Icons.palette_outlined,
-                        size: 20, color: NoveColors.secondaryText(context)),
-                    const SizedBox(width: 12),
+                    Icon(Icons.access_time_rounded, size: 12, color: NoveColors.mutedText(context)),
+                    const SizedBox(width: 4),
                     Text(
-                      'Color label',
-                      style: GoogleFonts.dmSans(
-                        fontSize: 15,
-                        color: NoveColors.primaryText(context),
-                      ),
+                      DateFormat('MMM d').format(DateTime.fromMillisecondsSinceEpoch(widget.note.updatedAt)),
+                      style: NoveTypography.caption(context),
                     ),
                     const Spacer(),
-<<<<<<< HEAD
-                    for (final c in kNoteColorLabels)
-=======
-                    for (final c in [
-                      '#C0452A',
-                      '#F5C842',
-                      '#5DCAA5',
-                      '#85B7EB',
-                      '#ED93B1',
-                      '#FFFFFF',
-                    ])
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
-                      GestureDetector(
-                        onTap: () {
-                          Navigator.pop(context);
-                          widget.onColorChange(c);
-                        },
-                        child: Container(
-                          margin: const EdgeInsets.only(left: 6),
-                          width: 22,
-                          height: 22,
-                          decoration: BoxDecoration(
-                            color: c == '#FFFFFF'
-                                ? Colors.transparent
-                                : Color(int.parse(
-                                    c.replaceFirst('#', '0xFF'))),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: widget.note.colorLabel == c
-                                  ? NoveColors.terracotta
-                                  : NoveColors.warmGray300,
-                              width: widget.note.colorLabel == c ? 2.5 : 1,
-                            ),
-                          ),
-                          child: c == '#FFFFFF'
-                              ? const Icon(Icons.block,
-                                  size: 12, color: NoveColors.warmGray400)
-                              : null,
-                        ),
+                    if (widget.note.tags.isNotEmpty)
+                      Row(
+                        children: widget.note.tags.take(2).map((t) => Padding(
+                          padding: const EdgeInsets.only(left: 8),
+                          child: Text('#$t', style: NoveTypography.caption(context).copyWith(color: NoveColors.accent(context))),
+                        )).toList(),
                       ),
-                    const SizedBox(width: 12),
                   ],
                 ),
-              ),
-              _ContextAction(
-                icon: Icons.share_outlined,
-                label: 'Share note',
-                onTap: () {
-                  Navigator.pop(context);
-<<<<<<< HEAD
-                  final shareText = widget.note.title.isNotEmpty
-                      ? '${widget.note.title}\n\n${widget.note.content}'
-                      : widget.note.content;
-                  SharePlus.instance.share(ShareParams(text: shareText));
-=======
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
-                },
-              ),
-              _ContextAction(
-                icon: Icons.delete_outline,
-                label: 'Delete note',
-                color: NoveColors.error,
-                onTap: () {
-                  Navigator.pop(context);
-                  widget.onDelete();
-                },
-              ),
-              const SizedBox(height: 8),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final catColor = _getLeftBorderColor(widget.note);
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _isHovered = true),
-      onExit: (_) => setState(() => _isHovered = false),
-      child: GestureDetector(
-        onTapDown: (_) => setState(() => _isHovered = true),
-        onTapUp: (_) => setState(() => _isHovered = false),
-        onTapCancel: () => setState(() => _isHovered = false),
-        onTap: widget.onTap,
-        onLongPress: () => _showContextMenu(context),
-        child: AnimatedScale(
-          scale: _isHovered ? 0.98 : 1.0,
-          duration: NoveAnimation.fast,
-          curve: NoveAnimation.snappy,
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            decoration: BoxDecoration(
-              color: NoveColors.cardBg(context),
-              borderRadius: BorderRadius.circular(NoveRadii.lg),
-              border: Border.all(color: NoveColors.cardBorder(context), width: 1),
-              boxShadow: _isHovered ? NoveShadows.cardElevated(context) : NoveShadows.cardLight(context),
-            ),
-            child: IntrinsicHeight(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Container(
-                    width: 6,
-                    decoration: BoxDecoration(
-                      color: catColor,
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(NoveRadii.lg),
-                        bottomLeft: Radius.circular(NoveRadii.lg),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  widget.note.title.isNotEmpty ? widget.note.title : 'Untitled',
-                                  style: NoveTypography.h3(context),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              Row(
-                                children: [
-                                  if (widget.note.isPinned)
-                                    const Icon(Icons.push_pin_rounded, size: 16, color: NoveColors.terracotta),
-                                  if (widget.note.isFavorite) ...[
-                                    const SizedBox(width: 4),
-                                    const Icon(Icons.star_rounded, size: 16, color: NoveColors.amber),
-                                  ]
-                                ],
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-<<<<<<< HEAD
-                            widget.note.content.isNotEmpty
-                                ? _cleanPreview(widget.note.content)
-                                : 'No additional text...',
-=======
-                            widget.note.content.isNotEmpty ? widget.note.content : 'No additional text...',
->>>>>>> 89545a56f2292ebb16fde939916540c4a792ef7f
-                            style: NoveTypography.bodySm(context),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(_timeLabel(), style: NoveTypography.caption(context)),
-                              Text(
-                                '${widget.note.wordCount} words',
-                                style: NoveTypography.caption(context).copyWith(fontWeight: NoveTypography.medium),
-                              ),
-                            ],
-                          )
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              ],
             ),
           ),
         ),
@@ -1382,115 +579,59 @@ class _NoteCardState extends State<NoteCard> {
   }
 }
 
-class _ContextAction extends StatelessWidget {
-  final IconData icon;
+class _BentoStat extends StatelessWidget {
   final String label;
-  final VoidCallback onTap;
-  final Color? color;
-
-  const _ContextAction({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-    this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final c = color ?? NoveColors.primaryText(context);
-    return ListTile(
-      leading: Icon(icon, size: 20, color: c),
-      title: Text(
-        label,
-        style: GoogleFonts.dmSans(
-          fontSize: 15,
-          color: c,
-          fontWeight: FontWeight.w500,
+  final String value;
+  final IconData icon;
+  const _BentoStat({required this.label, required this.value, required this.icon});
+  @override Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(16),
+    decoration: BoxDecoration(
+      color: NoveColors.bg(context),
+      borderRadius: BorderRadius.circular(NoveRadii.xl),
+    ),
+    child: Row(
+      children: [
+        Icon(icon, size: 20, color: NoveColors.accent(context)),
+        const SizedBox(width: 12),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(value, style: NoveTypography.h3(context).copyWith(fontWeight: FontWeight.bold)),
+            Text(label, style: NoveTypography.caption(context)),
+          ],
         ),
-      ),
-      onTap: onTap,
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-    );
+      ],
+    ),
+  );
+}
+
+class _HighlightedText extends StatelessWidget {
+  final String text;
+  final String query;
+  final TextStyle style;
+  final int maxLines;
+  const _HighlightedText({required this.text, required this.query, required this.style, this.maxLines = 1});
+  @override Widget build(BuildContext context) {
+    if (query.isEmpty || !text.toLowerCase().contains(query.toLowerCase())) return Text(text, style: style, maxLines: maxLines, overflow: TextOverflow.ellipsis);
+    final spans = <TextSpan>[];
+    int start = 0;
+    final lower = text.toLowerCase();
+    final q = query.toLowerCase();
+    int idx;
+    while ((idx = lower.indexOf(q, start)) != -1) {
+      if (idx > start) spans.add(TextSpan(text: text.substring(start, idx)));
+      spans.add(TextSpan(text: text.substring(idx, idx + query.length), style: style.copyWith(backgroundColor: Colors.amber.withValues(alpha: 0.4))));
+      start = idx + query.length;
+    }
+    if (start < text.length) spans.add(TextSpan(text: text.substring(start)));
+    return RichText(text: TextSpan(style: style, children: spans), maxLines: maxLines, overflow: TextOverflow.ellipsis);
   }
 }
 
-class EnhancedFAB extends StatefulWidget {
+class EnhancedFAB extends StatelessWidget {
   final ScrollController scrollController;
   final VoidCallback onPressed;
-
-  const EnhancedFAB({
-    super.key,
-    required this.scrollController,
-    required this.onPressed,
-  });
-
-  @override
-  State<EnhancedFAB> createState() => _EnhancedFABState();
-}
-
-class _EnhancedFABState extends State<EnhancedFAB> with SingleTickerProviderStateMixin {
-  bool _isExtended = true;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.scrollController.addListener(_onScroll);
-  }
-
-  void _onScroll() {
-    if (widget.scrollController.position.pixels > 50 && _isExtended) {
-      setState(() => _isExtended = false);
-    } else if (widget.scrollController.position.pixels <= 50 && !_isExtended) {
-      setState(() => _isExtended = true);
-    }
-  }
-
-  @override
-  void dispose() {
-    widget.scrollController.removeListener(_onScroll);
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: NoveAnimation.fast,
-      curve: NoveAnimation.smooth,
-      height: 56,
-      width: _isExtended ? 140 : 56,
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [NoveColors.terracottaLight, NoveColors.terracotta],
-        ),
-        borderRadius: BorderRadius.circular(NoveRadii.full),
-        boxShadow: NoveShadows.floating,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(NoveRadii.full),
-          onTap: widget.onPressed,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.add, color: Colors.white),
-              if (_isExtended) ...[
-                const SizedBox(width: 8),
-                Text(
-                  'New Note',
-                  style: NoveTypography.body(context).copyWith(
-                    color: Colors.white,
-                    fontWeight: NoveTypography.semiBold,
-                  ),
-                ),
-              ]
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+  const EnhancedFAB({super.key, required this.scrollController, required this.onPressed});
+  @override Widget build(BuildContext context) => FloatingActionButton.extended(onPressed: onPressed, icon: const Icon(Icons.add), label: const Text('New Note'), backgroundColor: NoveColors.terracotta);
 }
